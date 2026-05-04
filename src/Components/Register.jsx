@@ -7,13 +7,7 @@ import ENDPOINTS from "../utils/endpoints";
 
 function Register() {
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
-  });
-
+  const [formData, setFormData] = useState({ username: "", email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -28,8 +22,7 @@ function Register() {
     let error = "";
     if (name === "username") {
       if (!value) error = "Username is required";
-      else if (!usernameRegex.test(value))
-        error = "3-20 chars, letters, numbers, underscore only";
+      else if (!usernameRegex.test(value)) error = "3-20 chars (letters/numbers)";
     }
     if (name === "email") {
       if (!value) error = "Email is required";
@@ -37,8 +30,7 @@ function Register() {
     }
     if (name === "password") {
       if (!value) error = "Password is required";
-      else if (!passwordRegex.test(value))
-        error = "Min 6 chars, include letter & number";
+      else if (!passwordRegex.test(value)) error = "Min 6 chars, letter & number";
     }
     return error;
   };
@@ -49,34 +41,26 @@ function Register() {
     setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
   };
 
-  const validate = () => {
-    let temp = {};
-    Object.keys(formData).forEach((key) => {
-      const err = validateField(key, formData[key]);
-      if (err) temp[key] = err;
-    });
-    setErrors(temp);
-    return Object.keys(temp).length === 0;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    const tempErrors = {};
+    Object.keys(formData).forEach(key => {
+      const err = validateField(key, formData[key]);
+      if (err) tempErrors[key] = err;
+    });
+    
+    if (Object.keys(tempErrors).length > 0) {
+      setErrors(tempErrors);
+      return;
+    }
 
     setLoading(true);
     setMessage("");
-    setIsError(false);
-
     try {
-      const res = await axios.post(
-        `${BASE_URL}${ENDPOINTS.AUTH.REGISTER}`,
-        formData,
-      );
-
+      const res = await axios.post(`${BASE_URL}${ENDPOINTS.AUTH.REGISTER}`, formData, { withCredentials: true });
       if (res.data.success) {
         setMessage(res.data.message);
         setIsError(false);
-        setFormData({ username: "", email: "", password: "" });
         setTimeout(() => navigate("/login"), 1500);
       } else {
         setMessage(res.data.message);
@@ -91,128 +75,77 @@ function Register() {
   };
 
   return (
-    <div className="container">
-      <div className="register-box">
-        <div className="header-content">
-          <div className="logo-text">AI Chat App</div>
+    <div className="register-page">
+      <div className="register-card">
+        <button className="close-btn" onClick={() => navigate("/")}>&times;</button>
+        
+        <div className="header-section">
+          <div className="brand">AI CHAT APP</div>
           <h1>Create your account</h1>
         </div>
 
-        <button className="google-btn" type="button">
-          <img
-            src="https://cdn-icons-png.flaticon.com/512/281/281764.png"
-            alt="google"
-          />
+        <button className="google-signin" type="button">
+          <img src="https://cdn-icons-png.flaticon.com/512/281/281764.png" alt="G" />
           Continue with Google
         </button>
 
-        <div className="divider">
-          <span>or</span>
-        </div>
+        <div className="separator"><span>OR</span></div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="field-group">
             <input
               type="text"
               name="username"
               placeholder="Username"
               value={formData.username}
               onChange={handleChange}
-              className={
-                errors.username
-                  ? "input-error"
-                  : formData.username
-                    ? "input-valid"
-                    : ""
-              }
+              className={errors.username ? "input-err" : ""}
             />
-            {errors.username && <p className="error-text">{errors.username}</p>}
+            {errors.username && <span className="err-hint">{errors.username}</span>}
           </div>
 
-          <div className="form-group">
+          <div className="field-group">
             <input
               type="email"
               name="email"
               placeholder="Email address"
               value={formData.email}
               onChange={handleChange}
-              className={
-                errors.email
-                  ? "input-error"
-                  : formData.email
-                    ? "input-valid"
-                    : ""
-              }
+              className={errors.email ? "input-err" : ""}
             />
-            {errors.email && <p className="error-text">{errors.email}</p>}
+            {errors.email && <span className="err-hint">{errors.email}</span>}
           </div>
 
-          <div className="form-group">
-            <div className="password-wrapper">
+          <div className="field-group">
+            <div className="password-input-container">
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
-                className={
-                  errors.password
-                    ? "input-error"
-                    : formData.password
-                      ? "input-valid"
-                      : ""
-                }
+                className={errors.password ? "input-err" : ""}
               />
-              <span
-                className="toggle-password"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                    <path d="M1 1l22 22" />
-                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </span>
+              <button type="button" className="eye-icon" onClick={() => setShowPassword(!showPassword)}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
             </div>
-            {errors.password && <p className="error-text">{errors.password}</p>}
+            {errors.password && <span className="err-hint">{errors.password}</span>}
           </div>
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? "Creating..." : "Create account"}
           </button>
         </form>
 
         {message && (
-          <div
-            className={`status-msg ${isError ? "msg-error" : "msg-success"}`}
-          >
+          <div className={`status-alert ${isError ? "alert-error" : "alert-success"}`}>
             {message}
           </div>
         )}
 
-        <p className="footer-link">
-          Already have an account? <Link to="/login">Log in</Link>
+        <p className="login-prompt">
+          Already have an account? <Link to="/login" className="link-bold">Log in</Link>
         </p>
       </div>
     </div>

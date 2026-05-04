@@ -15,18 +15,18 @@ const Chat = () => {
   const typingIntervalRef = useRef(null);
   const navigate = useNavigate();
 
+  // Get User Details
   const userId = sessionStorage.getItem("userId");
-
-  // =============================
-  // Auto scroll to bottom
-  // =============================
-  useEffect(() => {
+  const userName = sessionStorage.getItem("userName");
+  const emailId = sessionStorage.getItem("emailId");
+  const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [chat]);
 
-  // =============================
-  // Load history (FIXED ESLINT WARNING)
-  // =============================
   const loadHistory = useCallback(async () => {
     try {
       const data = await ChatService.getChatHistory(userId);
@@ -38,57 +38,33 @@ const Chat = () => {
 
   useEffect(() => {
     if (userId) loadHistory();
-
-    return () => {
-      if (typingIntervalRef.current) {
-        clearInterval(typingIntervalRef.current);
-      }
-    };
+    return () => clearInterval(typingIntervalRef.current);
   }, [userId, loadHistory]);
 
-  // =============================
-  // Load chat from history
-  // =============================
   const handleHistoryClick = async (title) => {
     setLoading(true);
-    setError("");
-
     try {
       const messages = await ChatService.getChatDetails(userId, title);
-
       const formatted = messages.flatMap((msg) => [
         { type: "user", text: msg.requestMessage },
         { type: "ai", text: msg.responseMessage },
       ]);
-
       setChat(formatted);
     } catch (err) {
-      setError("Failed to load chat details");
-      console.error(err);
+      setError("Failed to load conversation");
     } finally {
       setLoading(false);
     }
   };
 
-  // =============================
-  // FIXED typing animation (NO missing letters)
-  // =============================
   const typeMessage = (text) => {
     let index = 0;
+    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
 
-    if (typingIntervalRef.current) {
-      clearInterval(typingIntervalRef.current);
-    }
-
-    // reset AI message first
     setChat((prev) => {
       const updated = [...prev];
       const last = updated.length - 1;
-
-      if (updated[last]?.type === "ai") {
-        updated[last] = { ...updated[last], text: "" };
-      }
-
+      if (updated[last]?.type === "ai") updated[last].text = "";
       return updated;
     });
 
@@ -96,72 +72,42 @@ const Chat = () => {
       setChat((prev) => {
         const updated = [...prev];
         const last = updated.length - 1;
-
         if (updated[last]?.type === "ai") {
-          updated[last] = {
-            ...updated[last],
-            text: text.substring(0, index + 1), // ✅ FIXED (no missing chars)
-          };
+          updated[last].text = text.substring(0, index + 1);
         }
-
         return updated;
       });
-
       index++;
-
       if (index >= text.length) {
         clearInterval(typingIntervalRef.current);
         setLoading(false);
       }
-    }, 15);
+    }, 20);
   };
 
-  // =============================
-  // Send message
-  // =============================
   const handleSend = async () => {
     if (!message.trim() || loading) return;
-
-    const userMessage = message;
+    const userMsg = message;
     const isFirst = chat.length === 0;
 
     setMessage("");
-    setError("");
-
     setChat((prev) => [
       ...prev,
-      { type: "user", text: userMessage },
+      { type: "user", text: userMsg },
       { type: "ai", text: "" },
     ]);
-
     setLoading(true);
 
     try {
-      const res = await ChatService.sendMessage(userMessage, userId);
-
+      const res = await ChatService.sendMessage(userMsg, userId);
       typeMessage(res.response);
-
-      if (isFirst) {
-        loadHistory();
-      }
+      if (isFirst) loadHistory();
     } catch (err) {
-      console.error(err);
-      setError("Failed to get response");
+      setError("Error getting response");
       setLoading(false);
     }
   };
 
-  // =============================
-  // New chat
-  // =============================
-  const handleNewChat = () => {
-    setChat([]);
-    setError("");
-  };
-
-  // =============================
-  // Logout
-  // =============================
   const handleLogout = () => {
     sessionStorage.clear();
     navigate("/");
@@ -169,22 +115,31 @@ const Chat = () => {
 
   return (
     <div className="chat-container">
-      {/* SIDEBAR */}
       <aside className="sidebar">
-        <button className="new-chat-btn" onClick={handleNewChat}>
+        <div className="user-profile-card">
+  <div className="avatar user-icon">
+    {userName ? userName.charAt(0).toUpperCase() : "U"}
+  </div>
+  <div className="user-info">
+    <span className="username" title={userName}>{userName}</span>
+    <span className="user-email" title={emailId}>{emailId}</span>
+    <span className="status">● Online</span>
+  </div>
+</div>
+
+        <button className="new-chat-btn" onClick={() => setChat([])}>
           + New Chat
         </button>
 
         <div className="history-list">
           <p className="history-label">Recent</p>
-
           {history.map((item, i) => (
             <div
-              key={item.id || i}
+              key={i}
               className="history-item"
               onClick={() => handleHistoryClick(item.requestMessage)}
             >
-              💬 {item.requestMessage}
+              <span>💬</span> {item.requestMessage}
             </div>
           ))}
         </div>
@@ -194,69 +149,55 @@ const Chat = () => {
         </button>
       </aside>
 
-      {/* CHAT AREA */}
       <main className="chat-interface">
         <div className="chat-window">
           <div className="message-list">
             {chat.map((msg, i) => (
               <div key={i} className={`message-wrapper ${msg.type}`}>
-                <div className="avatar">{msg.type === "user" ? "U" : "AI"}</div>
-
+                <div className={`avatar ${msg.type === "user" ? "user-icon" : ""}`}>
+                  {msg.type === "user" ? userName.charAt(0) : "AI"}
+                </div>
                 <div className="message-content">
                   <div className="sender-name">
-                    {msg.type === "user" ? "You" : "Assistant"}
+                    {msg.type === "user" ? userName : "Assistant"}
                   </div>
-
                   <div className="message-text">
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
                   </div>
                 </div>
               </div>
             ))}
-
-            {/* Typing indicator */}
             {loading && chat[chat.length - 1]?.text === "" && (
               <div className="message-wrapper ai">
                 <div className="avatar">AI</div>
                 <div className="message-content">
-                  <div className="typing">Typing...</div>
+                  <div className="sender-name">Assistant</div>
+                  <div className="message-text">Thinking...</div>
                 </div>
               </div>
             )}
-
             <div ref={chatEndRef} />
           </div>
         </div>
 
-        {/* INPUT AREA */}
         <div className="input-area">
           <div className="input-container">
             <input
               type="text"
-              placeholder="Message..."
+              placeholder="Type a message..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
             />
-
-            <button
-              className="send-btn"
-              onClick={handleSend}
-              disabled={loading || !message.trim()}
-            >
+            <button className="send-btn" onClick={handleSend} disabled={!message.trim()}>
               ↑
             </button>
           </div>
-
-          <p className="disclaimer">
-            AI can make mistakes. Verify important info.
-          </p>
-
-          {error && <p className="error-text">{error}</p>}
+          {error && <p style={{color: 'red', textAlign: 'center', marginTop: '8px'}}>{error}</p>}
         </div>
       </main>
     </div>
   );
 };
-// {}
+
 export default Chat;

@@ -5,7 +5,7 @@ import ENDPOINTS from "../utils/endpoints";
 const ChatService = {
   getChatHistory: async (userId) => {
     const res = await axios.get(`${BASE_URL}${ENDPOINTS.CHAT.HISTORY}`, {
-      params: { userId: userId }, // Wrap in 'params'
+      params: { userId: userId }, withCredentials: true// Wrap in 'params'
     });
     return res.data;
   },
@@ -15,14 +15,14 @@ const ChatService = {
       params: {
         userId: userId,
         title: title,
-      },
+      },withCredentials: true
     });
     return res.data;
   },
   sendMessage: async (message, userId) => {
     const res = await axios.post(`${BASE_URL}${ENDPOINTS.CHAT.SEND_MESSAGE}`, {
       message,
-      userid: userId,
+      userid: userId,withCredentials: true
     });
     return res.data;
   },

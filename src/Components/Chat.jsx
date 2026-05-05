@@ -10,39 +10,52 @@ const Chat = () => {
   const [loading, setLoading] = useState(false);
   const [chat, setChat] = useState([]);
   const [history, setHistory] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+
+  // Menu & Edit States
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [editIndex, setEditIndex] = useState(null);
+  const [editText, setEditText] = useState("");
+
+  // Custom Delete Popup States
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState({ title: "", index: null });
 
   const chatEndRef = useRef(null);
   const typingIntervalRef = useRef(null);
   const navigate = useNavigate();
 
-  // Get User Details
   const userId = sessionStorage.getItem("userId");
   const userName = sessionStorage.getItem("userName");
-  const emailId = sessionStorage.getItem("emailId");
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
+  // Auto-scroll to bottom
   useEffect(() => {
-    scrollToBottom();
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
 
   const loadHistory = useCallback(async () => {
     try {
       const data = await ChatService.getChatHistory(userId);
       setHistory(data || []);
-    } catch (err) {
-      console.error("History error:", err);
+    } catch {
+      setError("Failed to load history");
     }
   }, [userId]);
 
   useEffect(() => {
     if (userId) loadHistory();
-    return () => clearInterval(typingIntervalRef.current);
+    const handleClickOutside = () => setMenuOpen(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => {
+      clearInterval(typingIntervalRef.current);
+      window.removeEventListener("click", handleClickOutside);
+    };
   }, [userId, loadHistory]);
 
-  const handleHistoryClick = async (title) => {
+  const handleHistoryClick = async (title, index) => {
+    setActiveChat(index);
     setLoading(true);
+    setError("");
     try {
       const messages = await ChatService.getChatDetails(userId, title);
       const formatted = messages.flatMap((msg) => [
@@ -50,47 +63,55 @@ const Chat = () => {
         { type: "ai", text: msg.responseMessage },
       ]);
       setChat(formatted);
-    } catch (err) {
+    } catch {
       setError("Failed to load conversation");
     } finally {
       setLoading(false);
     }
   };
 
-  const typeMessage = (text) => {
-    let index = 0;
-    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+  const initiateDelete = (title, index) => {
+    setItemToDelete({ title, index });
+    setShowDeletePopup(true);
+    setMenuOpen(null);
+  };
 
-    setChat((prev) => {
-      const updated = [...prev];
-      const last = updated.length - 1;
-      if (updated[last]?.type === "ai") updated[last].text = "";
-      return updated;
-    });
-
-    typingIntervalRef.current = setInterval(() => {
-      setChat((prev) => {
-        const updated = [...prev];
-        const last = updated.length - 1;
-        if (updated[last]?.type === "ai") {
-          updated[last].text = text.substring(0, index + 1);
-        }
-        return updated;
-      });
-      index++;
-      if (index >= text.length) {
-        clearInterval(typingIntervalRef.current);
-        setLoading(false);
+  const confirmDelete = async () => {
+    const { title, index } = itemToDelete;
+    try {
+      await ChatService.deleteChat(userId, title);
+      const updated = history.filter((_, i) => i !== index);
+      setHistory(updated);
+      if (activeChat === index) {
+        setChat([]);
+        setActiveChat(null);
       }
-    }, 20);
+      setShowDeletePopup(false);
+    } catch {
+      setError("Delete failed");
+    }
   };
 
   const handleSend = async () => {
     if (!message.trim() || loading) return;
-    const userMsg = message;
-    const isFirst = chat.length === 0;
 
+    const userMsg = message;
     setMessage("");
+
+    // 1. Determine the Title
+    // If activeChat is set, we use that title.
+    // If it's a brand new chat, the very first user message will be the title.
+    let currentChatTitle = null;
+
+    if (activeChat !== null && history[activeChat]) {
+      currentChatTitle = history[activeChat].requestMessage;
+    } else if (chat.length > 0) {
+      // If we are in a "New Chat" but have already sent one message,
+      // the title should be the very first message in our current 'chat' state.
+      currentChatTitle = chat[0].text;
+    }
+
+    // Update UI immediately
     setChat((prev) => [
       ...prev,
       { type: "user", text: userMsg },
@@ -99,52 +120,160 @@ const Chat = () => {
     setLoading(true);
 
     try {
-      const res = await ChatService.sendMessage(userMsg, userId);
+      // 2. Send the message with the determined title
+      const res = await ChatService.sendMessage(
+        userMsg,
+        userId,
+        currentChatTitle,
+      );
+
       typeMessage(res.response);
-      if (isFirst) loadHistory();
+
+      // 3. Refresh History
+      // After the first message of a new chat, we need to find its new index
+      // so subsequent messages use the same title.
+      const updatedHistory = await ChatService.getChatHistory(userId);
+      setHistory(updatedHistory || []);
+
+      // If this was the first message (new chat), find it in the new history and set it active
+      if (activeChat === null) {
+        const newIndex = updatedHistory.findIndex(
+          (h) => h.requestMessage === (currentChatTitle || userMsg),
+        );
+        if (newIndex !== -1) setActiveChat(newIndex);
+      }
     } catch (err) {
       setError("Error getting response");
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.clear();
-    navigate("/");
+  const typeMessage = (text) => {
+    let i = 0;
+    clearInterval(typingIntervalRef.current);
+    typingIntervalRef.current = setInterval(() => {
+      setChat((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1].text = text.substring(0, i + 1);
+        return updated;
+      });
+      i++;
+      if (i >= text.length) {
+        clearInterval(typingIntervalRef.current);
+        setLoading(false);
+      }
+    }, 20);
   };
 
   return (
     <div className="chat-container">
-      <aside className="sidebar">
-        <div className="user-profile-card">
-  <div className="avatar user-icon">
-    {userName ? userName.charAt(0).toUpperCase() : "U"}
-  </div>
-  <div className="user-info">
-    <span className="username" title={userName}>{userName}</span>
-    <span className="user-email" title={emailId}>{emailId}</span>
-    <span className="status">● Online</span>
-  </div>
-</div>
+      {showDeletePopup && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDeletePopup(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete chat?</h3>
+            <p>
+              This will delete <b>"{itemToDelete.title}"</b>. This action cannot
+              be undone.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="cancel-btn"
+                onClick={() => setShowDeletePopup(false)}
+              >
+                Cancel
+              </button>
+              <button className="danger-btn" onClick={confirmDelete}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-        <button className="new-chat-btn" onClick={() => setChat([])}>
+      <aside className="sidebar">
+        <div className="user-profile">
+          <div className="user-avatar">{userName?.charAt(0).toUpperCase()}</div>
+          <span className="username-text">{userName}</span>
+        </div>
+
+        <button
+          className="new-chat-btn"
+          onClick={() => {
+            setChat([]);
+            setActiveChat(null);
+          }}
+        >
           + New Chat
         </button>
 
         <div className="history-list">
-          <p className="history-label">Recent</p>
+          <p className="history-label">Recent Chats</p>
           {history.map((item, i) => (
             <div
               key={i}
-              className="history-item"
-              onClick={() => handleHistoryClick(item.requestMessage)}
+              className={`history-item ${activeChat === i ? "active" : ""}`}
+              onClick={() => handleHistoryClick(item.requestMessage, i)}
             >
-              <span>💬</span> {item.requestMessage}
+              <div className="history-text">
+                {editIndex === i ? (
+                  <input
+                    className="edit-input"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onBlur={() => setEditIndex(null)}
+                    autoFocus
+                  />
+                ) : (
+                  <span>{item.requestMessage}</span>
+                )}
+              </div>
+              <div className="menu-container">
+                <button
+                  className="three-dots"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(menuOpen === i ? null : i);
+                  }}
+                >
+                  ⋮
+                </button>
+                {menuOpen === i && (
+                  <div className="popup-menu">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditIndex(i);
+                        setEditText(item.requestMessage);
+                        setMenuOpen(null);
+                      }}
+                    >
+                      Rename
+                    </button>
+                    <button
+                      className="delete-opt"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        initiateDelete(item.requestMessage, i);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
-
-        <button className="logout-btn" onClick={handleLogout}>
+        <button
+          className="logout-btn"
+          onClick={() => {
+            sessionStorage.clear();
+            navigate("/");
+          }}
+        >
           Logout
         </button>
       </aside>
@@ -152,49 +281,52 @@ const Chat = () => {
       <main className="chat-interface">
         <div className="chat-window">
           <div className="message-list">
+            {chat.length === 0 && (
+              <div className="empty-chat">
+                <h2>How can I help you today, {userName}?</h2>
+              </div>
+            )}
             {chat.map((msg, i) => (
               <div key={i} className={`message-wrapper ${msg.type}`}>
-                <div className={`avatar ${msg.type === "user" ? "user-icon" : ""}`}>
-                  {msg.type === "user" ? userName.charAt(0) : "AI"}
+                <div
+                  className={`avatar ${msg.type === "user" ? "user-icon" : "ai-icon"}`}
+                >
+                  {msg.type === "user"
+                    ? userName?.charAt(0).toUpperCase()
+                    : "G"}
                 </div>
                 <div className="message-content">
-                  <div className="sender-name">
-                    {msg.type === "user" ? userName : "Assistant"}
-                  </div>
+                  <p className="sender-name">
+                    {msg.type === "user" ? userName : "Gemini"}
+                  </p>
                   <div className="message-text">
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
                   </div>
                 </div>
               </div>
             ))}
-            {loading && chat[chat.length - 1]?.text === "" && (
-              <div className="message-wrapper ai">
-                <div className="avatar">AI</div>
-                <div className="message-content">
-                  <div className="sender-name">Assistant</div>
-                  <div className="message-text">Thinking...</div>
-                </div>
-              </div>
-            )}
             <div ref={chatEndRef} />
           </div>
         </div>
 
-        <div className="input-area">
+        <footer className="input-area">
           <div className="input-container">
             <input
-              type="text"
-              placeholder="Type a message..."
+              placeholder="Message Gemini..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
             />
-            <button className="send-btn" onClick={handleSend} disabled={!message.trim()}>
+            <button
+              className="send-btn"
+              onClick={handleSend}
+              disabled={loading}
+            >
               ↑
             </button>
           </div>
-          {error && <p style={{color: 'red', textAlign: 'center', marginTop: '8px'}}>{error}</p>}
-        </div>
+          {error && <p className="error-text">{error}</p>}
+        </footer>
       </main>
     </div>
   );

@@ -7,6 +7,7 @@ import ENDPOINTS from "../utils/endpoints";
 
 const Login = () => {
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -17,13 +18,11 @@ const Login = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    // Clear error as user types
+
     if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
+      const updated = { ...errors };
+      delete updated[name];
+      setErrors(updated);
     }
   };
 
@@ -34,55 +33,65 @@ const Login = () => {
   };
 
   const validateField = (name, value) => {
-    let errorMsg = "";
+    let error = "";
+
     if (name === "email") {
-      if (!value) errorMsg = "Email is required";
-      else if (!/\S+@\S+\.\S+/.test(value)) errorMsg = "Please enter a valid email";
+      if (!value) error = "Email is required";
+      else if (!/\S+@\S+\.\S+/.test(value)) error = "Invalid email";
     }
+
     if (name === "password") {
-      if (!value) errorMsg = "Password is required";
-      else if (value.length < 6) errorMsg = "Password must be at least 6 characters";
+      if (!value) error = "Password is required";
+      else if (value.length < 6) error = "Minimum 6 characters";
     }
-    setErrors((prev) => ({ ...prev, [name]: errorMsg }));
+
+    setErrors((prev) => ({ ...prev, [name]: error }));
   };
 
   const validateForm = () => {
     const newErrors = {};
+
     if (!formData.email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Invalid email format";
-    
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      newErrors.email = "Invalid email";
+
     if (!formData.password) newErrors.password = "Password is required";
-    else if (formData.password.length < 6) newErrors.password = "Password too short";
+    else if (formData.password.length < 6)
+      newErrors.password = "Minimum 6 characters";
 
     setErrors(newErrors);
     setTouched({ email: true, password: true });
+
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async () => {
     if (!validateForm()) return;
+
     setLoading(true);
     setMessage({ text: "", type: "" });
 
     try {
-      const response = await axios.post(
+      const res = await axios.post(
         `${BASE_URL}${ENDPOINTS.AUTH.LOGIN}`,
         formData,
-        { withCredentials: true }
+        { withCredentials: true },
       );
-      
-      if (response.data.success) {
-        setMessage({ text: response.data.message || "Login Successful!", type: "success" });
-        sessionStorage.setItem("userId", response.data.userId);
-        sessionStorage.setItem("emailId", response.data.emailId);
-        sessionStorage.setItem("userName", response.data.userName);
-        setTimeout(() => navigate("/Chat"), 1500);
+
+      if (res.data.success) {
+        setMessage({ text: "Login Successful!", type: "success" });
+
+        sessionStorage.setItem("userId", res.data.userId);
+        sessionStorage.setItem("emailId", res.data.emailId);
+        sessionStorage.setItem("userName", res.data.userName);
+
+        setTimeout(() => navigate("/Chat"), 1200);
       } else {
-        setMessage({ text: response.data.message, type: "error" });
+        setMessage({ text: res.data.message, type: "error" });
       }
-    } catch (error) {
+    } catch (err) {
       setMessage({
-        text: error.response?.data?.message || "❌ Login failed. Please try again.",
+        text: err.response?.data?.message || "Login failed",
         type: "error",
       });
     } finally {
@@ -91,15 +100,14 @@ const Login = () => {
   };
 
   return (
-    <div className="overlay">
-      <div className="modal">
-        <button className="close-btn">×</button>
-        <div className="logo-section">
-          <span className="logo-text">AI CHAT APP</span>
-        </div>
-        <h2 className="title">Log into your account</h2>
+    <div className="login-overlay">
+      <div className="login-modal">
+        <button className="login-close">×</button>
 
-        <button className="google-btn" type="button">
+        <div className="login-logo">AI CHAT APP</div>
+        <h2 className="login-title">Log into your account</h2>
+
+        <button className="login-google">
           <img
             src="https://cdn-icons-png.flaticon.com/512/281/281764.png"
             alt="google"
@@ -107,52 +115,59 @@ const Login = () => {
           Continue with Google
         </button>
 
-        <div className="divider">
+        <div className="login-divider">
           <span>OR</span>
         </div>
 
-        <div className="form-container">
-          {/* Email Group */}
-          <div className="input-group">
+        <div className="login-form">
+          {/* EMAIL */}
+          <div className="login-group">
             <input
               type="email"
               name="email"
-              placeholder="Enter your email address"
-              className={`input ${touched.email && errors.email ? "input-error" : ""}`}
+              placeholder="Email address"
               value={formData.email}
               onChange={handleChange}
               onBlur={handleBlur}
-              autoComplete="email"
+              className={`login-input ${
+                touched.email && errors.email ? "input-error" : ""
+              }`}
             />
-            {touched.email && errors.email && <span className="error-text">{errors.email}</span>}
+            {touched.email && errors.email && (
+              <span className="login-error">{errors.email}</span>
+            )}
           </div>
 
-          {/* Password Group */}
-          <div className="input-group">
-            <div className="password-wrapper">
+          {/* PASSWORD */}
+          <div className="login-group">
+            <div className="login-password">
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
-                placeholder="Enter password"
-                className={`input ${touched.password && errors.password ? "input-error" : ""}`}
+                placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                autoComplete="current-password"
+                className={`login-input ${
+                  touched.password && errors.password ? "input-error" : ""
+                }`}
               />
-              <button 
-                type="button" 
-                className="toggle-password" 
+              <button
+                type="button"
+                className="login-toggle"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? "HIDE" : "SHOW"}
+                {showPassword ? "Hide" : "Show"}
               </button>
             </div>
-            {touched.password && errors.password && <span className="error-text">{errors.password}</span>}
+
+            {touched.password && errors.password && (
+              <span className="login-error">{errors.password}</span>
+            )}
           </div>
 
-          <div className="forgot">Forgot Password?</div>
-          
+          <div className="login-forgot">Forgot password?</div>
+
           <button
             className="login-btn"
             onClick={handleLogin}
@@ -163,11 +178,11 @@ const Login = () => {
         </div>
 
         {message.text && (
-          <div className={`api-message ${message.type}`}>{message.text}</div>
+          <div className={`login-message ${message.type}`}>{message.text}</div>
         )}
 
-        <p className="signup-text">
-          No account yet? <Link to="/">Sign up</Link>
+        <p className="login-footer">
+          Don’t have an account? <Link to="/">Sign up</Link>
         </p>
       </div>
     </div>

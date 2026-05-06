@@ -10,6 +10,7 @@ const ENDPOINTS = {
   AUTH: {
     LOGIN: "/Auth/login",
     REGISTER: "/Auth/register",
+    GOOGLE_LOGIN: "/Auth/GoogleLogin"
   },
 };
 

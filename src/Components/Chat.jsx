@@ -247,18 +247,24 @@ const Chat = () => {
         err?.message ||
         "Something went wrong";
 
-      // Remove empty AI message
-      setChat((prev) => prev.slice(0, -1));
+      // Remove empty AI placeholder
+      setChat((prev) => {
+        const updated = [...prev];
 
-      // Show backend error in chat
-      setChat((prev) => [
-        ...prev,
-        {
-          type: "ai",
-          text: `❌ ${backendError}`,
-        },
-      ]);
+        if (
+          updated.length > 0 &&
+          updated[updated.length - 1].type ===
+            "ai" &&
+          updated[updated.length - 1].text ===
+            ""
+        ) {
+          updated.pop();
+        }
 
+        return updated;
+      });
+
+      // Show only in label
       setError(backendError);
 
       setLoading(false);
@@ -358,6 +364,7 @@ const Chat = () => {
           onClick={() => {
             setChat([]);
             setActiveChat(null);
+            setError("");
           }}
         >
           + New Chat

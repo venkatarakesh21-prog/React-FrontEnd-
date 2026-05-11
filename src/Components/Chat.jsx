@@ -5,32 +5,58 @@ import React, {
   useCallback,
 } from "react";
 
-import "./Chat.css";
+import {
+  Box,
+  Typography,
+  Button,
+  TextField,
+  IconButton,
+  Avatar,
+  Paper,
+  CircularProgress,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Divider,
+} from "@mui/material";
+
+import {
+  SendRounded,
+  AddRounded,
+  MoreVertRounded,
+  LogoutRounded,
+} from "@mui/icons-material";
+
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import ChatService from "../Services/ChatService";
 
 const Chat = () => {
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [chat, setChat] = useState([]);
   const [history, setHistory] = useState([]);
-  const [activeChat, setActiveChat] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [activeChat, setActiveChat] =
+    useState(null);
 
-  // Menu & Edit States
-  const [menuOpen, setMenuOpen] = useState(null);
-  const [editIndex, setEditIndex] = useState(null);
-  const [editText, setEditText] = useState("");
+  const [anchorEl, setAnchorEl] =
+    useState(null);
 
-  // Delete Popup
+  const [selectedIndex, setSelectedIndex] =
+    useState(null);
+
   const [showDeletePopup, setShowDeletePopup] =
     useState(false);
 
-  const [itemToDelete, setItemToDelete] = useState({
-    title: "",
-    index: null,
-  });
+  const [itemToDelete, setItemToDelete] =
+    useState({
+      title: "",
+      index: null,
+    });
 
   const chatEndRef = useRef(null);
   const typingIntervalRef = useRef(null);
@@ -38,32 +64,28 @@ const Chat = () => {
   const navigate = useNavigate();
 
   const userId = sessionStorage.getItem("userId");
-  const userName = sessionStorage.getItem("userName");
 
-  // Auto scroll
+  const userName =
+    sessionStorage.getItem("userName");
+
+  // AUTO SCROLL
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
   }, [chat]);
 
-  // Load history
+  // LOAD HISTORY
   const loadHistory = useCallback(async () => {
     try {
       const data =
-        await ChatService.getChatHistory(userId);
+        await ChatService.getChatHistory(
+          userId,
+        );
 
       setHistory(data || []);
     } catch (err) {
       console.error(err);
-
-      const backendError =
-        err?.response?.data?.response ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to load history";
-
-      setError(backendError);
     }
   }, [userId]);
 
@@ -72,33 +94,17 @@ const Chat = () => {
       loadHistory();
     }
 
-    const handleClickOutside = () => {
-      setMenuOpen(null);
-    };
-
-    window.addEventListener(
-      "click",
-      handleClickOutside,
-    );
-
     return () => {
       clearInterval(typingIntervalRef.current);
-
-      window.removeEventListener(
-        "click",
-        handleClickOutside,
-      );
     };
   }, [userId, loadHistory]);
 
-  // Load selected chat
+  // LOAD CHAT
   const handleHistoryClick = async (
     title,
     index,
   ) => {
     setActiveChat(index);
-    setLoading(true);
-    setError("");
 
     try {
       const messages =
@@ -107,80 +113,32 @@ const Chat = () => {
           title,
         );
 
-      const formatted = messages.flatMap((msg) => [
-        {
-          type: "user",
-          text: msg.requestMessage,
-        },
-        {
-          type: "ai",
-          text: msg.responseMessage,
-        },
-      ]);
+      const formatted = messages.flatMap(
+        (msg) => [
+          {
+            type: "user",
+            text: msg.requestMessage,
+          },
+          {
+            type: "ai",
+            text: msg.responseMessage,
+          },
+        ],
+      );
 
       setChat(formatted);
     } catch (err) {
       console.error(err);
-
-      const backendError =
-        err?.response?.data?.response ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to load conversation";
-
-      setError(backendError);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Delete popup
-  const initiateDelete = (title, index) => {
-    setItemToDelete({ title, index });
-    setShowDeletePopup(true);
-    setMenuOpen(null);
-  };
-
-  // Confirm delete
-  const confirmDelete = async () => {
-    const { title, index } = itemToDelete;
-
-    try {
-      await ChatService.deleteChat(userId, title);
-
-      const updated = history.filter(
-        (_, i) => i !== index,
-      );
-
-      setHistory(updated);
-
-      if (activeChat === index) {
-        setChat([]);
-        setActiveChat(null);
-      }
-
-      setShowDeletePopup(false);
-    } catch (err) {
-      console.error(err);
-
-      const backendError =
-        err?.response?.data?.response ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Delete failed";
-
-      setError(backendError);
-    }
-  };
-
-  // Send message
+  // SEND MESSAGE
   const handleSend = async () => {
     if (!message.trim() || loading) return;
 
     const userMsg = message;
 
     setMessage("");
-    setError("");
 
     let currentChatTitle = null;
 
@@ -194,7 +152,6 @@ const Chat = () => {
       currentChatTitle = chat[0].text;
     }
 
-    // Show user message immediately
     setChat((prev) => [
       ...prev,
       {
@@ -219,59 +176,20 @@ const Chat = () => {
 
       typeMessage(res.response);
 
-      // Refresh history
       const updatedHistory =
-        await ChatService.getChatHistory(userId);
+        await ChatService.getChatHistory(
+          userId,
+        );
 
       setHistory(updatedHistory || []);
-
-      // Activate new chat
-      if (activeChat === null) {
-        const newIndex =
-          updatedHistory.findIndex(
-            (h) =>
-              h.requestMessage ===
-              (currentChatTitle || userMsg),
-          );
-
-        if (newIndex !== -1) {
-          setActiveChat(newIndex);
-        }
-      }
     } catch (err) {
-      console.error("Backend Error:", err);
-
-      const backendError =
-        err?.response?.data?.response ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Something went wrong";
-
-      // Remove empty AI placeholder
-      setChat((prev) => {
-        const updated = [...prev];
-
-        if (
-          updated.length > 0 &&
-          updated[updated.length - 1].type ===
-            "ai" &&
-          updated[updated.length - 1].text ===
-            ""
-        ) {
-          updated.pop();
-        }
-
-        return updated;
-      });
-
-      // Show only in label
-      setError(backendError);
+      console.error(err);
 
       setLoading(false);
     }
   };
 
-  // Typing effect
+  // TYPING EFFECT
   const typeMessage = (text) => {
     let i = 0;
 
@@ -296,271 +214,588 @@ const Chat = () => {
 
         setLoading(false);
       }
-    }, 20);
+    }, 15);
+  };
+
+  // MENU
+  const handleMenuOpen = (
+    event,
+    index,
+  ) => {
+    setAnchorEl(event.currentTarget);
+
+    setSelectedIndex(index);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+
+    setSelectedIndex(null);
+  };
+
+  // DELETE
+  const initiateDelete = (title, index) => {
+    setItemToDelete({ title, index });
+
+    setShowDeletePopup(true);
+
+    handleMenuClose();
+  };
+
+  const confirmDelete = async () => {
+    const { title, index } = itemToDelete;
+
+    try {
+      await ChatService.deleteChat(
+        userId,
+        title,
+      );
+
+      const updated = history.filter(
+        (_, i) => i !== index,
+      );
+
+      setHistory(updated);
+
+      if (activeChat === index) {
+        setChat([]);
+        setActiveChat(null);
+      }
+
+      setShowDeletePopup(false);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
-    <div className="chat-container">
-      {showDeletePopup && (
-        <div
-          className="modal-overlay"
-          onClick={() =>
-            setShowDeletePopup(false)
-          }
+    <Box
+      sx={{
+        height: "100vh",
+        display: "flex",
+        bgcolor: "#f4f7fb",
+        overflow: "hidden",
+      }}
+    >
+      {/* SIDEBAR */}
+      <Box
+        sx={{
+          width: 240,
+          bgcolor: "#ffffff",
+          borderRight:
+            "1px solid #dbe4f0",
+          display: "flex",
+          flexDirection: "column",
+          p: 1.5,
+        }}
+      >
+        {/* PROFILE */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.5,
+            borderRadius: 3,
+            bgcolor: "#f8fafc",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            mb: 2,
+            border: "1px solid #e2e8f0",
+          }}
         >
-          <div
-            className="modal"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
+          <Avatar
+            sx={{
+              width: 42,
+              height: 42,
+              bgcolor: "#7c3aed",
+              fontWeight: 700,
+              fontSize: 18,
+            }}
           >
-            <h3>Delete chat?</h3>
-
-            <p>
-              This will delete
-              <b>
-                {" "}
-                "{itemToDelete.title}"
-              </b>
-              . This action cannot be undone.
-            </p>
-
-            <div className="modal-actions">
-              <button
-                className="cancel-btn"
-                onClick={() =>
-                  setShowDeletePopup(false)
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                className="danger-btn"
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <aside className="sidebar">
-        <div className="user-profile">
-          <div className="user-avatar">
             {userName
               ?.charAt(0)
               .toUpperCase()}
-          </div>
+          </Avatar>
 
-          <span className="username-text">
-            {userName}
-          </span>
-        </div>
+          <Box>
+            <Typography
+              sx={{
+                color: "#64748b",
+                fontSize: 11,
+              }}
+            >
+              Welcome Back
+            </Typography>
 
-        <button
-          className="new-chat-btn"
+            <Typography
+              sx={{
+                color: "#111827",
+                fontWeight: 700,
+                fontSize: 15,
+                lineHeight: 1.2,
+              }}
+            >
+              {userName}
+            </Typography>
+          </Box>
+        </Paper>
+
+        {/* NEW CHAT */}
+        <Button
+          fullWidth
+          startIcon={<AddRounded />}
           onClick={() => {
             setChat([]);
             setActiveChat(null);
-            setError("");
+          }}
+          sx={{
+            py: 1.2,
+            borderRadius: 3,
+            background:
+              "linear-gradient(135deg,#7c3aed,#2563eb)",
+            color: "#fff",
+            textTransform: "none",
+            fontWeight: 700,
+            fontSize: 14,
+            mb: 2,
+
+            "&:hover": {
+              opacity: 0.95,
+            },
           }}
         >
-          + New Chat
-        </button>
+          New Chat
+        </Button>
 
-        <div className="history-list">
-          <p className="history-label">
-            Recent Chats
-          </p>
+        {/* HISTORY */}
+        <Typography
+          sx={{
+            color: "#64748b",
+            fontWeight: 700,
+            mb: 1.5,
+            fontSize: 14,
+          }}
+        >
+          Recent Chats
+        </Typography>
 
+        <Box
+          sx={{
+            flex: 1,
+            overflowY: "auto",
+          }}
+        >
           {history.map((item, i) => (
-            <div
+            <Paper
               key={i}
-              className={`history-item ${
-                activeChat === i
-                  ? "active"
-                  : ""
-              }`}
+              elevation={0}
               onClick={() =>
                 handleHistoryClick(
                   item.requestMessage,
                   i,
                 )
               }
-            >
-              <div className="history-text">
-                {editIndex === i ? (
-                  <input
-                    className="edit-input"
-                    value={editText}
-                    onChange={(e) =>
-                      setEditText(
-                        e.target.value,
-                      )
-                    }
-                    onBlur={() =>
-                      setEditIndex(null)
-                    }
-                    autoFocus
-                  />
-                ) : (
-                  <span>
-                    {item.requestMessage}
-                  </span>
-                )}
-              </div>
+              sx={{
+                p: 1.4,
+                mb: 1,
+                borderRadius: 3,
+                cursor: "pointer",
+                bgcolor:
+                  activeChat === i
+                    ? "#eef2ff"
+                    : "#ffffff",
 
-              <div className="menu-container">
-                <button
-                  className="three-dots"
+                border:
+                  activeChat === i
+                    ? "1px solid #2563eb"
+                    : "1px solid #e2e8f0",
+
+                "&:hover": {
+                  bgcolor: "#f8fafc",
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography
+                  sx={{
+                    color: "#111827",
+                    overflow: "hidden",
+                    textOverflow:
+                      "ellipsis",
+                    whiteSpace: "nowrap",
+                    width: "80%",
+                    fontWeight: 500,
+                    fontSize: 14,
+                  }}
+                >
+                  {item.requestMessage}
+                </Typography>
+
+                <IconButton
+                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
 
-                    setMenuOpen(
-                      menuOpen === i
-                        ? null
-                        : i,
-                    );
+                    handleMenuOpen(e, i);
+                  }}
+                  sx={{
+                    color: "#64748b",
                   }}
                 >
-                  ⋮
-                </button>
-
-                {menuOpen === i && (
-                  <div className="popup-menu">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-
-                        setEditIndex(i);
-
-                        setEditText(
-                          item.requestMessage,
-                        );
-
-                        setMenuOpen(null);
-                      }}
-                    >
-                      Rename
-                    </button>
-
-                    <button
-                      className="delete-opt"
-                      onClick={(e) => {
-                        e.stopPropagation();
-
-                        initiateDelete(
-                          item.requestMessage,
-                          i,
-                        );
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+                  <MoreVertRounded fontSize="small" />
+                </IconButton>
+              </Box>
+            </Paper>
           ))}
-        </div>
+        </Box>
 
-        <button
-          className="logout-btn"
+        <Divider
+          sx={{
+            borderColor: "#e2e8f0",
+            my: 1.5,
+          }}
+        />
+
+        {/* LOGOUT */}
+        <Button
+          startIcon={<LogoutRounded />}
           onClick={() => {
             sessionStorage.clear();
+
             navigate("/");
+          }}
+          sx={{
+            py: 1.1,
+            borderRadius: 3,
+            bgcolor: "#ef4444",
+            color: "#fff",
+            textTransform: "none",
+            fontWeight: 700,
+            fontSize: 14,
+
+            "&:hover": {
+              bgcolor: "#dc2626",
+            },
           }}
         >
           Logout
-        </button>
-      </aside>
+        </Button>
+      </Box>
 
-      <main className="chat-interface">
-        <div className="chat-window">
-          <div className="message-list">
-            {chat.length === 0 && (
-              <div className="empty-chat">
-                <h2>
-                  How can I help you today,
-                  {userName}?
-                </h2>
-              </div>
-            )}
+      {/* CHAT AREA */}
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          bgcolor: "#f4f7fb",
+        }}
+      >
+        {/* HEADER */}
+        <Box
+          sx={{
+            px: 3,
+            py: 1.8,
+            borderBottom:
+              "1px solid #dbe4f0",
+            bgcolor: "#ffffff",
+          }}
+        >
+          <Typography
+            sx={{
+              color: "#111827",
+              fontSize: 20,
+              fontWeight: 800,
+            }}
+          >
+            Gemini AI
+          </Typography>
+        </Box>
 
-            {chat.map((msg, i) => (
-              <div
-                key={i}
-                className={`message-wrapper ${msg.type}`}
+        {/* MESSAGES */}
+        <Box
+          sx={{
+            flex: 1,
+            overflowY: "auto",
+            px: 3,
+            py: 2,
+          }}
+        >
+          {chat.length === 0 ? (
+            <Box
+              sx={{
+                height: "100%",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "column",
+              }}
+            >
+              <Typography
+                sx={{
+                  color: "#111827",
+                  fontSize: 28,
+                  fontWeight: 800,
+                  mb: 1,
+                }}
               >
-                <div
-                  className={`avatar ${
-                    msg.type === "user"
-                      ? "user-icon"
-                      : "ai-icon"
-                  }`}
-                >
-                  {msg.type === "user"
-                    ? userName
-                        ?.charAt(0)
-                        .toUpperCase()
-                    : "G"}
-                </div>
+                Hello, {userName}
+              </Typography>
 
-                <div className="message-content">
-                  <p className="sender-name">
+              <Typography
+                sx={{
+                  color: "#64748b",
+                  fontSize: 14,
+                }}
+              >
+                Start chatting with Gemini
+              </Typography>
+            </Box>
+          ) : (
+            chat.map((msg, i) => (
+              <Box
+                key={i}
+                sx={{
+                  display: "flex",
+                  justifyContent:
+                    msg.type === "user"
+                      ? "flex-end"
+                      : "flex-start",
+                  mb: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection:
+                      msg.type === "user"
+                        ? "row-reverse"
+                        : "row",
+                    alignItems: "flex-end",
+                    gap: 1,
+                    maxWidth: "55%",
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      width: 38,
+                      height: 38,
+                      fontSize: 18,
+                      bgcolor:
+                        msg.type === "user"
+                          ? "#2563eb"
+                          : "#7c3aed",
+                    }}
+                  >
                     {msg.type === "user"
                       ? userName
-                      : "Gemini"}
-                  </p>
+                          ?.charAt(0)
+                          .toUpperCase()
+                      : "G"}
+                  </Avatar>
 
-                  <div className="message-text">
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      px: 1.8,
+                      py: 1.2,
+                      borderRadius: 4,
+                      bgcolor:
+                        msg.type === "user"
+                          ? "#2563eb"
+                          : "#ffffff",
+
+                      color:
+                        msg.type === "user"
+                          ? "#ffffff"
+                          : "#111827",
+
+                      fontSize: 14,
+                      lineHeight: 1.6,
+
+                      border:
+                        "1px solid #e2e8f0",
+
+                      wordBreak: "break-word",
+                    }}
+                  >
                     <ReactMarkdown>
                       {msg.text}
                     </ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            ))}
+                  </Paper>
+                </Box>
+              </Box>
+            ))
+          )}
 
-            <div ref={chatEndRef} />
-          </div>
-        </div>
+          <div ref={chatEndRef} />
+        </Box>
 
-        <footer className="input-area">
-          <div className="input-container">
-            <input
-              placeholder="Message Gemini..."
+        {/* INPUT AREA */}
+        <Box
+          sx={{
+            p: 2,
+            borderTop:
+              "1px solid #dbe4f0",
+            bgcolor: "#ffffff",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+            }}
+          >
+            <TextField
+              fullWidth
+              placeholder="Type your message..."
               value={message}
               onChange={(e) =>
-                setMessage(
-                  e.target.value,
-                )
+                setMessage(e.target.value)
               }
               onKeyDown={(e) =>
                 e.key === "Enter" &&
                 handleSend()
               }
+              variant="outlined"
+              autoComplete="off"
+              InputProps={{
+                sx: {
+                  backgroundColor:
+                    "#ffffff",
+
+                  borderRadius: "14px",
+
+                  "& input": {
+                    color: "#111827",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    caretColor: "#111827",
+                    padding: "12px",
+                  },
+
+                  "& input::placeholder": {
+                    color: "#94a3b8",
+                    opacity: 1,
+                  },
+
+                  "& fieldset": {
+                    border:
+                      "1px solid #dbe4f0",
+                  },
+
+                  "&:hover fieldset": {
+                    border:
+                      "1px solid #2563eb",
+                  },
+
+                  "&.Mui-focused fieldset":
+                    {
+                      border:
+                        "1px solid #2563eb",
+                    },
+                },
+              }}
             />
 
-            <button
-              className="send-btn"
+            <Button
               onClick={handleSend}
               disabled={loading}
-            >
-              ↑
-            </button>
-          </div>
+              sx={{
+                minWidth: 50,
+                width: 50,
+                height: 50,
+                borderRadius: 3,
+                background:
+                  "linear-gradient(135deg,#7c3aed,#2563eb)",
+                color: "#fff",
 
-          {error && (
-            <p className="error-text">
-              {error}
-            </p>
-          )}
-        </footer>
-      </main>
-    </div>
+                "&:hover": {
+                  opacity: 0.95,
+                },
+              }}
+            >
+              {loading ? (
+                <CircularProgress
+                  size={20}
+                  sx={{
+                    color: "#fff",
+                  }}
+                />
+              ) : (
+                <SendRounded fontSize="small" />
+              )}
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* MENU */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem
+          onClick={() => {
+            const item =
+              history[selectedIndex];
+
+            initiateDelete(
+              item.requestMessage,
+              selectedIndex,
+            );
+          }}
+        >
+          Delete
+        </MenuItem>
+      </Menu>
+
+      {/* DELETE DIALOG */}
+      <Dialog
+        open={showDeletePopup}
+        onClose={() =>
+          setShowDeletePopup(false)
+        }
+      >
+        <DialogTitle>
+          Delete Chat?
+        </DialogTitle>
+
+        <DialogContent>
+          <DialogContentText>
+            This conversation will be
+            permanently deleted.
+          </DialogContentText>
+        </DialogContent>
+
+        <DialogActions>
+          <Button
+            onClick={() =>
+              setShowDeletePopup(false)
+            }
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmDelete}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

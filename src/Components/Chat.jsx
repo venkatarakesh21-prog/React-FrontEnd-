@@ -18,7 +18,7 @@ import {
   MenuItem,
   Dialog,
   DialogTitle,
- DialogContent,
+  DialogContent,
   DialogContentText,
   DialogActions,
   Divider,
@@ -119,6 +119,7 @@ const Chat = () => {
     index,
   ) => {
     setActiveChat(index);
+    setError("");
 
     try {
       const messages =
@@ -215,31 +216,22 @@ const Chat = () => {
         err?.message ||
         "Something went wrong";
 
-      // CLEAN ERROR
+      // CLEAN ERROR MESSAGE
       if (
         backendError.includes(
           "User location is not supported",
         )
       ) {
         backendError =
-          "Service is not available in your region.";
+          "Service is currently unavailable in your region.";
       }
 
-      // SHOW ERROR BUBBLE
-      setChat((prev) => {
-        const updated = [...prev];
+      // REMOVE EMPTY AI MESSAGE
+      setChat((prev) =>
+        prev.slice(0, prev.length - 1),
+      );
 
-        updated[
-          updated.length - 1
-        ] = {
-          type: "ai",
-          text: `❌ ${backendError}`,
-          isError: true,
-        };
-
-        return updated;
-      });
-
+      // SHOW ERROR BELOW INPUT
       setError(backendError);
 
       setLoading(false);
@@ -676,18 +668,12 @@ const Chat = () => {
                       borderRadius: 4,
 
                       bgcolor:
-                        msg.isError
-                          ? "#fee2e2"
-                          : msg.type ===
-                            "user"
+                        msg.type === "user"
                           ? "#2563eb"
                           : "#ffffff",
 
                       color:
-                        msg.isError
-                          ? "#dc2626"
-                          : msg.type ===
-                            "user"
+                        msg.type === "user"
                           ? "#ffffff"
                           : "#111827",
 
@@ -802,7 +788,7 @@ const Chat = () => {
             </Button>
           </Box>
 
-          {/* ERROR TEXT */}
+          {/* ERROR MESSAGE */}
           {error && (
             <Typography
               sx={{
@@ -810,6 +796,7 @@ const Chat = () => {
                 fontSize: 13,
                 mt: 1,
                 ml: 1,
+                fontWeight: 500,
               }}
             >
               {error}

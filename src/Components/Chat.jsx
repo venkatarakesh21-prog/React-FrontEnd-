@@ -37,6 +37,7 @@ import ChatService from "../Services/ChatService";
 
 const Chat = () => {
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [chat, setChat] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -86,6 +87,14 @@ const Chat = () => {
       setHistory(data || []);
     } catch (err) {
       console.error(err);
+
+      const backendError =
+        err?.response?.data?.response ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to load history";
+
+      setError(backendError);
     }
   }, [userId]);
 
@@ -105,6 +114,7 @@ const Chat = () => {
     index,
   ) => {
     setActiveChat(index);
+    setError("");
 
     try {
       const messages =
@@ -129,6 +139,14 @@ const Chat = () => {
       setChat(formatted);
     } catch (err) {
       console.error(err);
+
+      const backendError =
+        err?.response?.data?.response ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to load conversation";
+
+      setError(backendError);
     }
   };
 
@@ -139,6 +157,7 @@ const Chat = () => {
     const userMsg = message;
 
     setMessage("");
+    setError("");
 
     let currentChatTitle = null;
 
@@ -183,7 +202,37 @@ const Chat = () => {
 
       setHistory(updatedHistory || []);
     } catch (err) {
-      console.error(err);
+      console.error("Backend Error:", err);
+
+      const backendError =
+        err?.response?.data?.response ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Something went wrong";
+
+      setChat((prev) => {
+        const updated = [...prev];
+
+        if (
+          updated.length > 0 &&
+          updated[updated.length - 1]
+            .type === "ai" &&
+          updated[updated.length - 1]
+            .text === ""
+        ) {
+          updated.pop();
+        }
+
+        updated.push({
+          type: "ai",
+          text: `❌ ${backendError}`,
+          error: true,
+        });
+
+        return updated;
+      });
+
+      setError(backendError);
 
       setLoading(false);
     }
@@ -265,6 +314,14 @@ const Chat = () => {
       setShowDeletePopup(false);
     } catch (err) {
       console.error(err);
+
+      const backendError =
+        err?.response?.data?.response ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Delete failed";
+
+      setError(backendError);
     }
   };
 
@@ -347,6 +404,7 @@ const Chat = () => {
           onClick={() => {
             setChat([]);
             setActiveChat(null);
+            setError("");
           }}
           sx={{
             py: 1.2,
@@ -468,7 +526,6 @@ const Chat = () => {
           startIcon={<LogoutRounded />}
           onClick={() => {
             sessionStorage.clear();
-
             navigate("/");
           }}
           sx={{
@@ -607,15 +664,18 @@ const Chat = () => {
                       px: 1.8,
                       py: 1.2,
                       borderRadius: 4,
-                      bgcolor:
-                        msg.type === "user"
-                          ? "#2563eb"
-                          : "#ffffff",
 
-                      color:
-                        msg.type === "user"
-                          ? "#ffffff"
-                          : "#111827",
+                      bgcolor: msg.error
+                        ? "#fee2e2"
+                        : msg.type === "user"
+                        ? "#2563eb"
+                        : "#ffffff",
+
+                      color: msg.error
+                        ? "#dc2626"
+                        : msg.type === "user"
+                        ? "#ffffff"
+                        : "#111827",
 
                       fontSize: 14,
                       lineHeight: 1.6,
@@ -735,6 +795,20 @@ const Chat = () => {
               )}
             </Button>
           </Box>
+
+          {error && (
+            <Typography
+              sx={{
+                color: "#dc2626",
+                fontSize: 13,
+                mt: 1,
+                ml: 1,
+                fontWeight: 500,
+              }}
+            >
+              {error}
+            </Typography>
+          )}
         </Box>
       </Box>
 

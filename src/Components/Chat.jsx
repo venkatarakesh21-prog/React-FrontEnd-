@@ -33,8 +33,13 @@ import {
   LogoutRounded,
 } from "@mui/icons-material";
 
-import { useNavigate } from "react-router-dom";
+import {
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+
 import ReactMarkdown from "react-markdown";
+
 import ChatService from "../Services/ChatService";
 
 const Chat = () => {
@@ -74,6 +79,8 @@ const Chat = () => {
     useRef(null);
 
   const navigate = useNavigate();
+
+  const { chatId } = useParams();
 
   const userId =
     sessionStorage.getItem("userId");
@@ -123,6 +130,54 @@ const Chat = () => {
     };
   }, [userId, loadHistory]);
 
+  // LOAD CHAT FROM URL
+  useEffect(() => {
+    const loadChatFromUrl =
+      async () => {
+        if (!chatId) return;
+
+        try {
+          const decodedChatId =
+            decodeURIComponent(chatId);
+
+          setActiveChat(
+            decodedChatId,
+          );
+
+          const messages =
+            await ChatService.getChatDetails(
+              userId,
+              decodedChatId,
+            );
+
+          const formatted =
+            messages.flatMap((msg) => [
+              {
+                type: "user",
+                text: msg.requestMessage,
+              },
+              {
+                type: "ai",
+                text: msg.responseMessage,
+              },
+            ]);
+
+          setChat(formatted);
+        } catch (err) {
+          console.error(err);
+
+          const backendError =
+            err?.response?.data
+              ?.message ||
+            "Failed to load conversation";
+
+          setError(backendError);
+        }
+      };
+
+    loadChatFromUrl();
+  }, [chatId, userId]);
+
   // LOAD CHAT DETAILS
   const handleHistoryClick =
     async (item) => {
@@ -130,6 +185,13 @@ const Chat = () => {
         setError("");
 
         setActiveChat(item.chatId);
+
+        // UPDATE URL
+        navigate(
+          `/chat/${encodeURIComponent(
+            item.chatId,
+          )}`,
+        );
 
         const messages =
           await ChatService.getChatDetails(
@@ -174,11 +236,6 @@ const Chat = () => {
     const currentChatId =
       activeChat;
 
-    console.log(
-      "ACTIVE CHAT ID:",
-      currentChatId,
-    );
-
     // ADD USER MESSAGE
     setChat((prev) => [
       ...prev,
@@ -202,15 +259,21 @@ const Chat = () => {
           currentChatId,
         );
 
-      // SET NEW CHAT ID
+      // NEW CHAT
       if (
         !currentChatId &&
         res.chatId
       ) {
         setActiveChat(res.chatId);
+
+        navigate(
+          `/chat/${encodeURIComponent(
+            res.chatId,
+          )}`,
+        );
       }
 
-      // TYPE AI RESPONSE
+      // TYPE RESPONSE
       typeMessage(res.response);
 
       // REFRESH HISTORY
@@ -224,15 +287,6 @@ const Chat = () => {
           ?.response ||
         err?.message ||
         "Something went wrong";
-
-      if (
-        backendError.includes(
-          "User location is not supported",
-        )
-      ) {
-        backendError =
-          "Service unavailable in your region.";
-      }
 
       // REMOVE EMPTY AI MESSAGE
       setChat((prev) =>
@@ -285,6 +339,8 @@ const Chat = () => {
     event,
     item,
   ) => {
+    event.stopPropagation();
+
     setAnchorEl(event.currentTarget);
 
     setSelectedItem(item);
@@ -328,6 +384,8 @@ const Chat = () => {
         setChat([]);
 
         setActiveChat(null);
+
+        navigate("/chat");
       }
 
       setShowDeletePopup(false);
@@ -415,6 +473,8 @@ const Chat = () => {
             setChat([]);
             setActiveChat(null);
             setError("");
+
+            navigate("/chat");
           }}
           sx={{
             py: 1.4,
@@ -485,14 +545,12 @@ const Chat = () => {
 
                 <IconButton
                   size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-
+                  onClick={(e) =>
                     handleMenuOpen(
                       e,
                       item,
-                    );
-                  }}
+                    )
+                  }
                 >
                   <MoreVertRounded fontSize="small" />
                 </IconButton>
@@ -651,7 +709,8 @@ const Chat = () => {
               }
               onKeyDown={(e) => {
                 if (
-                  e.key === "Enter"
+                  e.key === "Enter" &&
+                  !loading
                 ) {
                   handleSend();
                 }

@@ -1,3 +1,5 @@
+// Chat.jsx
+
 import React, {
   useState,
   useEffect,
@@ -36,13 +38,20 @@ import ReactMarkdown from "react-markdown";
 import ChatService from "../Services/ChatService";
 
 const Chat = () => {
-  const [message, setMessage] = useState("");
-  const [chat, setChat] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [message, setMessage] =
+    useState("");
+
+  const [chat, setChat] =
+    useState([]);
+
+  const [history, setHistory] =
+    useState([]);
+
   const [loading, setLoading] =
     useState(false);
 
-  const [error, setError] = useState("");
+  const [error, setError] =
+    useState("");
 
   const [activeChat, setActiveChat] =
     useState(null);
@@ -50,21 +59,19 @@ const Chat = () => {
   const [anchorEl, setAnchorEl] =
     useState(null);
 
-  const [selectedIndex, setSelectedIndex] =
+  const [selectedItem, setSelectedItem] =
     useState(null);
 
   const [showDeletePopup, setShowDeletePopup] =
     useState(false);
 
   const [itemToDelete, setItemToDelete] =
-    useState({
-      title: "",
-      index: null,
-    });
+    useState(null);
 
   const chatEndRef = useRef(null);
 
-  const typingIntervalRef = useRef(null);
+  const typingIntervalRef =
+    useRef(null);
 
   const navigate = useNavigate();
 
@@ -82,24 +89,27 @@ const Chat = () => {
   }, [chat]);
 
   // LOAD HISTORY
-  const loadHistory = useCallback(async () => {
-    try {
-      const data =
-        await ChatService.getChatHistory(
-          userId,
-        );
+  const loadHistory = useCallback(
+    async () => {
+      try {
+        const data =
+          await ChatService.getChatHistory(
+            userId,
+          );
 
-      setHistory(data || []);
-    } catch (err) {
-      console.error(err);
+        setHistory(data || []);
+      } catch (err) {
+        console.error(err);
 
-      const backendError =
-        err?.response?.data?.message ||
-        "Failed to load history";
+        const backendError =
+          err?.response?.data?.message ||
+          "Failed to load history";
 
-      setError(backendError);
-    }
-  }, [userId]);
+        setError(backendError);
+      }
+    },
+    [userId],
+  );
 
   useEffect(() => {
     if (userId) {
@@ -113,45 +123,43 @@ const Chat = () => {
     };
   }, [userId, loadHistory]);
 
-  // LOAD CHAT
-  const handleHistoryClick = async (
-    title,
-    index,
-  ) => {
-    setActiveChat(index);
-    setError("");
+  // LOAD CHAT DETAILS
+  const handleHistoryClick =
+    async (item) => {
+      try {
+        setError("");
 
-    try {
-      const messages =
-        await ChatService.getChatDetails(
-          userId,
-          title,
-        );
+        setActiveChat(item.chatId);
 
-      const formatted = messages.flatMap(
-        (msg) => [
-          {
-            type: "user",
-            text: msg.requestMessage,
-          },
-          {
-            type: "ai",
-            text: msg.responseMessage,
-          },
-        ],
-      );
+        const messages =
+          await ChatService.getChatDetails(
+            userId,
+            item.chatId,
+          );
 
-      setChat(formatted);
-    } catch (err) {
-      console.error(err);
+        const formatted =
+          messages.flatMap((msg) => [
+            {
+              type: "user",
+              text: msg.requestMessage,
+            },
+            {
+              type: "ai",
+              text: msg.responseMessage,
+            },
+          ]);
 
-      const backendError =
-        err?.response?.data?.message ||
-        "Failed to load conversation";
+        setChat(formatted);
+      } catch (err) {
+        console.error(err);
 
-      setError(backendError);
-    }
-  };
+        const backendError =
+          err?.response?.data?.message ||
+          "Failed to load conversation";
+
+        setError(backendError);
+      }
+    };
 
   // SEND MESSAGE
   const handleSend = async () => {
@@ -163,20 +171,15 @@ const Chat = () => {
     setMessage("");
     setError("");
 
-    let currentChatTitle = null;
+    const currentChatId =
+      activeChat;
 
-    if (
-      activeChat !== null &&
-      history[activeChat]
-    ) {
-      currentChatTitle =
-        history[activeChat]
-          .requestMessage;
-    } else if (chat.length > 0) {
-      currentChatTitle = chat[0].text;
-    }
+    console.log(
+      "ACTIVE CHAT ID:",
+      currentChatId,
+    );
 
-    // SHOW USER MESSAGE
+    // ADD USER MESSAGE
     setChat((prev) => [
       ...prev,
       {
@@ -196,34 +199,39 @@ const Chat = () => {
         await ChatService.sendMessage(
           userMsg,
           userId,
-          currentChatTitle,
+          currentChatId,
         );
 
+      // SET NEW CHAT ID
+      if (
+        !currentChatId &&
+        res.chatId
+      ) {
+        setActiveChat(res.chatId);
+      }
+
+      // TYPE AI RESPONSE
       typeMessage(res.response);
 
-      const updatedHistory =
-        await ChatService.getChatHistory(
-          userId,
-        );
-
-      setHistory(updatedHistory || []);
+      // REFRESH HISTORY
+      await loadHistory();
     } catch (err) {
       console.error(err);
 
       let backendError =
         err?.response?.data?.message ||
-        err?.response?.data?.response ||
+        err?.response?.data
+          ?.response ||
         err?.message ||
         "Something went wrong";
 
-      // CLEAN ERROR MESSAGE
       if (
         backendError.includes(
           "User location is not supported",
         )
       ) {
         backendError =
-          "Service is currently unavailable in your region.";
+          "Service unavailable in your region.";
       }
 
       // REMOVE EMPTY AI MESSAGE
@@ -231,7 +239,6 @@ const Chat = () => {
         prev.slice(0, prev.length - 1),
       );
 
-      // SHOW ERROR BELOW INPUT
       setError(backendError);
 
       setLoading(false);
@@ -276,28 +283,22 @@ const Chat = () => {
   // MENU
   const handleMenuOpen = (
     event,
-    index,
+    item,
   ) => {
     setAnchorEl(event.currentTarget);
 
-    setSelectedIndex(index);
+    setSelectedItem(item);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
 
-    setSelectedIndex(null);
+    setSelectedItem(null);
   };
 
   // DELETE
-  const initiateDelete = (
-    title,
-    index,
-  ) => {
-    setItemToDelete({
-      title,
-      index,
-    });
+  const initiateDelete = (item) => {
+    setItemToDelete(item);
 
     setShowDeletePopup(true);
 
@@ -305,23 +306,27 @@ const Chat = () => {
   };
 
   const confirmDelete = async () => {
-    const { title, index } =
-      itemToDelete;
-
     try {
       await ChatService.deleteChat(
         userId,
-        title,
+        itemToDelete.chatId,
       );
 
-      const updated = history.filter(
-        (_, i) => i !== index,
-      );
+      const updated =
+        history.filter(
+          (chatItem) =>
+            chatItem.chatId !==
+            itemToDelete.chatId,
+        );
 
       setHistory(updated);
 
-      if (activeChat === index) {
+      if (
+        activeChat ===
+        itemToDelete.chatId
+      ) {
         setChat([]);
+
         setActiveChat(null);
       }
 
@@ -343,14 +348,13 @@ const Chat = () => {
         height: "100vh",
         display: "flex",
         bgcolor: "#edf2f7",
-        overflow: "hidden",
       }}
     >
       {/* SIDEBAR */}
       <Box
         sx={{
           width: 250,
-          bgcolor: "#ffffff",
+          bgcolor: "#fff",
           borderRight:
             "1px solid #dbe4f0",
           display: "flex",
@@ -369,8 +373,6 @@ const Chat = () => {
             alignItems: "center",
             gap: 2,
             mb: 2,
-            border:
-              "1px solid #e2e8f0",
           }}
         >
           <Avatar
@@ -378,8 +380,6 @@ const Chat = () => {
               width: 52,
               height: 52,
               bgcolor: "#7c3aed",
-              fontWeight: 700,
-              fontSize: 20,
             }}
           >
             {userName
@@ -390,8 +390,8 @@ const Chat = () => {
           <Box>
             <Typography
               sx={{
-                color: "#64748b",
                 fontSize: 12,
+                color: "#64748b",
               }}
             >
               Welcome Back
@@ -399,10 +399,7 @@ const Chat = () => {
 
             <Typography
               sx={{
-                color: "#111827",
                 fontWeight: 700,
-                fontSize: 16,
-                lineHeight: 1.2,
               }}
             >
               {userName}
@@ -422,17 +419,10 @@ const Chat = () => {
           sx={{
             py: 1.4,
             borderRadius: 4,
+            mb: 3,
             background:
               "linear-gradient(135deg,#7c3aed,#2563eb)",
             color: "#fff",
-            textTransform: "none",
-            fontWeight: 700,
-            fontSize: 16,
-            mb: 3,
-
-            "&:hover": {
-              opacity: 0.95,
-            },
           }}
         >
           New Chat
@@ -441,10 +431,8 @@ const Chat = () => {
         {/* HISTORY */}
         <Typography
           sx={{
-            color: "#64748b",
-            fontWeight: 700,
             mb: 2,
-            fontSize: 15,
+            fontWeight: 700,
           }}
         >
           Recent Chats
@@ -456,35 +444,23 @@ const Chat = () => {
             overflowY: "auto",
           }}
         >
-          {history.map((item, i) => (
+          {history.map((item) => (
             <Paper
-              key={i}
+              key={item.chatId}
               elevation={0}
               onClick={() =>
-                handleHistoryClick(
-                  item.requestMessage,
-                  i,
-                )
+                handleHistoryClick(item)
               }
               sx={{
                 p: 1.5,
-                mb: 1.2,
+                mb: 1,
                 borderRadius: 3,
                 cursor: "pointer",
-
                 bgcolor:
-                  activeChat === i
+                  activeChat ===
+                  item.chatId
                     ? "#eef2ff"
-                    : "#ffffff",
-
-                border:
-                  activeChat === i
-                    ? "1px solid #2563eb"
-                    : "1px solid #e2e8f0",
-
-                "&:hover": {
-                  bgcolor: "#f8fafc",
-                },
+                    : "#fff",
               }}
             >
               <Box
@@ -497,14 +473,11 @@ const Chat = () => {
               >
                 <Typography
                   sx={{
-                    color: "#111827",
                     overflow: "hidden",
                     textOverflow:
                       "ellipsis",
                     whiteSpace: "nowrap",
                     width: "80%",
-                    fontWeight: 500,
-                    fontSize: 14,
                   }}
                 >
                   {item.requestMessage}
@@ -515,7 +488,10 @@ const Chat = () => {
                   onClick={(e) => {
                     e.stopPropagation();
 
-                    handleMenuOpen(e, i);
+                    handleMenuOpen(
+                      e,
+                      item,
+                    );
                   }}
                 >
                   <MoreVertRounded fontSize="small" />
@@ -532,6 +508,7 @@ const Chat = () => {
           startIcon={<LogoutRounded />}
           onClick={() => {
             sessionStorage.clear();
+
             navigate("/");
           }}
           sx={{
@@ -539,12 +516,6 @@ const Chat = () => {
             borderRadius: 3,
             bgcolor: "#ef4444",
             color: "#fff",
-            textTransform: "none",
-            fontWeight: 700,
-
-            "&:hover": {
-              bgcolor: "#dc2626",
-            },
           }}
         >
           Logout
@@ -564,7 +535,7 @@ const Chat = () => {
           sx={{
             px: 4,
             py: 2,
-            bgcolor: "#ffffff",
+            bgcolor: "#fff",
             borderBottom:
               "1px solid #dbe4f0",
           }}
@@ -573,7 +544,6 @@ const Chat = () => {
             sx={{
               fontSize: 22,
               fontWeight: 800,
-              color: "#111827",
             }}
           >
             Gemini AI
@@ -603,7 +573,6 @@ const Chat = () => {
                 sx={{
                   fontSize: 32,
                   fontWeight: 800,
-                  color: "#111827",
                 }}
               >
                 Hello, {userName}
@@ -612,10 +581,9 @@ const Chat = () => {
               <Typography
                 sx={{
                   color: "#64748b",
-                  mt: 1,
                 }}
               >
-                Start chatting with Gemini
+                Start chatting...
               </Typography>
             </Box>
           ) : (
@@ -628,69 +596,28 @@ const Chat = () => {
                     msg.type === "user"
                       ? "flex-end"
                       : "flex-start",
-                  mb: 2.5,
+                  mb: 2,
                 }}
               >
-                <Box
+                <Paper
                   sx={{
-                    display: "flex",
-                    flexDirection:
-                      msg.type === "user"
-                        ? "row-reverse"
-                        : "row",
-                    alignItems: "flex-end",
-                    gap: 1,
+                    p: 2,
+                    borderRadius: 4,
                     maxWidth: "65%",
+                    bgcolor:
+                      msg.type === "user"
+                        ? "#2563eb"
+                        : "#fff",
+                    color:
+                      msg.type === "user"
+                        ? "#fff"
+                        : "#111827",
                   }}
                 >
-                  <Avatar
-                    sx={{
-                      width: 38,
-                      height: 38,
-                      bgcolor:
-                        msg.type === "user"
-                          ? "#2563eb"
-                          : "#7c3aed",
-                    }}
-                  >
-                    {msg.type === "user"
-                      ? userName
-                          ?.charAt(0)
-                          .toUpperCase()
-                      : "G"}
-                  </Avatar>
-
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      px: 2,
-                      py: 1.5,
-                      borderRadius: 4,
-
-                      bgcolor:
-                        msg.type === "user"
-                          ? "#2563eb"
-                          : "#ffffff",
-
-                      color:
-                        msg.type === "user"
-                          ? "#ffffff"
-                          : "#111827",
-
-                      border:
-                        "1px solid #e2e8f0",
-
-                      fontSize: 14,
-                      lineHeight: 1.7,
-                      wordBreak:
-                        "break-word",
-                    }}
-                  >
-                    <ReactMarkdown>
-                      {msg.text}
-                    </ReactMarkdown>
-                  </Paper>
-                </Box>
+                  <ReactMarkdown>
+                    {msg.text}
+                  </ReactMarkdown>
+                </Paper>
               </Box>
             ))
           )}
@@ -702,7 +629,7 @@ const Chat = () => {
         <Box
           sx={{
             p: 2,
-            bgcolor: "#ffffff",
+            bgcolor: "#fff",
             borderTop:
               "1px solid #dbe4f0",
           }}
@@ -710,51 +637,24 @@ const Chat = () => {
           <Box
             sx={{
               display: "flex",
-              alignItems: "center",
-              gap: 1.5,
+              gap: 1,
             }}
           >
             <TextField
               fullWidth
-              placeholder="Type your message..."
+              placeholder="Type message..."
               value={message}
               onChange={(e) =>
                 setMessage(
                   e.target.value,
                 )
               }
-              onKeyDown={(e) =>
-                e.key === "Enter" &&
-                handleSend()
-              }
-              autoComplete="off"
-              InputProps={{
-                sx: {
-                  bgcolor: "#ffffff",
-                  borderRadius: 4,
-
-                  "& input": {
-                    color: "#111827",
-                    fontSize: 15,
-                    fontWeight: 500,
-                  },
-
-                  "& fieldset": {
-                    border:
-                      "1px solid #dbe4f0",
-                  },
-
-                  "&:hover fieldset": {
-                    border:
-                      "1px solid #2563eb",
-                  },
-
-                  "&.Mui-focused fieldset":
-                    {
-                      border:
-                        "1px solid #2563eb",
-                    },
-                },
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter"
+                ) {
+                  handleSend();
+                }
               }}
             />
 
@@ -763,16 +663,10 @@ const Chat = () => {
               disabled={loading}
               sx={{
                 minWidth: 52,
-                width: 52,
-                height: 52,
-                borderRadius: 4,
+                borderRadius: 3,
                 background:
                   "linear-gradient(135deg,#7c3aed,#2563eb)",
                 color: "#fff",
-
-                "&:hover": {
-                  opacity: 0.95,
-                },
               }}
             >
               {loading ? (
@@ -788,15 +682,12 @@ const Chat = () => {
             </Button>
           </Box>
 
-          {/* ERROR MESSAGE */}
           {error && (
             <Typography
               sx={{
-                color: "#dc2626",
-                fontSize: 13,
+                color: "red",
                 mt: 1,
-                ml: 1,
-                fontWeight: 500,
+                fontSize: 13,
               }}
             >
               {error}
@@ -812,15 +703,11 @@ const Chat = () => {
         onClose={handleMenuClose}
       >
         <MenuItem
-          onClick={() => {
-            const item =
-              history[selectedIndex];
-
+          onClick={() =>
             initiateDelete(
-              item.requestMessage,
-              selectedIndex,
-            );
-          }}
+              selectedItem,
+            )
+          }
         >
           Delete
         </MenuItem>

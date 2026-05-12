@@ -1,9 +1,16 @@
+// ChatService.js
+
 import axios from "axios";
+
 import BASE_URL from "./apiConfig";
+
 import ENDPOINTS from "../utils/endpoints";
 
 const ChatService = {
-  getChatHistory: async (userId) => {
+  // GET HISTORY
+  getChatHistory: async (
+    userId,
+  ) => {
     try {
       const res = await axios.get(
         `${BASE_URL}${ENDPOINTS.CHAT.HISTORY}`,
@@ -19,12 +26,19 @@ const ChatService = {
     }
   },
 
-  getChatDetails: async (userId, title) => {
+  // GET CHAT DETAILS
+  getChatDetails: async (
+    userId,
+    chatId,
+  ) => {
     try {
       const res = await axios.get(
         `${BASE_URL}${ENDPOINTS.CHAT.DETAILS}`,
         {
-          params: { userId, title },
+          params: {
+            userId,
+            chatId,
+          },
           withCredentials: true,
         },
       );
@@ -35,14 +49,19 @@ const ChatService = {
     }
   },
 
-  sendMessage: async (message, userId, title = null) => {
+  // SEND MESSAGE
+  sendMessage: async (
+    message,
+    userId,
+    chatId = null,
+  ) => {
     try {
       const res = await axios.post(
         `${BASE_URL}${ENDPOINTS.CHAT.SEND_MESSAGE}`,
         {
           message,
           userId,
-          title,
+          chatId,
         },
         {
           withCredentials: true,
@@ -55,58 +74,19 @@ const ChatService = {
     }
   },
 
-  deleteChat: async (userId, title) => {
+  // DELETE CHAT
+  deleteChat: async (
+    userId,
+    chatId,
+  ) => {
     try {
       const res = await axios.delete(
         `${BASE_URL}${ENDPOINTS.CHAT.DELETE_CHAT}`,
         {
-          data: { userId, title },
-          withCredentials: true,
-        },
-      );
-
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
-  },
-
-  updateChatTitle: async (userId, oldTitle, newTitle) => {
-    try {
-      const res = await axios.put(
-        `${BASE_URL}${ENDPOINTS.CHAT.UPDATE_TITLE}`,
-        {
-          userId,
-          oldTitle,
-          newTitle,
-        },
-        {
-          withCredentials: true,
-        },
-      );
-
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
-  },
-
-  updateMessage: async (
-    userId,
-    chatTitle,
-    messageIndex,
-    newMessage,
-  ) => {
-    try {
-      const res = await axios.put(
-        `${BASE_URL}${ENDPOINTS.CHAT.UPDATE_MESSAGE}`,
-        {
-          userId,
-          chatTitle,
-          messageIndex,
-          newMessage,
-        },
-        {
+          data: {
+            userId,
+            chatId,
+          },
           withCredentials: true,
         },
       );

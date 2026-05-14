@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+
 import {
   Box,
   Paper,
@@ -15,6 +16,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 import { Link, useNavigate } from "react-router-dom";
+
 import axios from "axios";
 
 import BASE_URL from "../Services/apiConfig";
@@ -25,29 +27,47 @@ import { GoogleLogin } from "@react-oauth/google";
 function Register() {
   const navigate = useNavigate();
 
+  // ---------------- STATE ----------------
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
   });
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({
+    username: "",
+    email: "",
+    password: "",
+  });
+
+  const [touched, setTouched] = useState({
+    username: false,
+    email: false,
+    password: false,
+  });
+
   const [message, setMessage] = useState({
     text: "",
     type: "",
   });
 
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  // ---------------- MAX LENGTHS ----------------
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  // ---------------- MAX LENGTH ----------------
   const USERNAME_MAX = 20;
   const EMAIL_MAX = 50;
   const PASSWORD_MAX = 20;
 
   // ---------------- REGEX ----------------
-  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const usernameRegex =
+    /^[a-zA-Z0-9_]{3,20}$/;
+
+  const emailRegex =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const passwordRegex =
     /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
 
@@ -55,7 +75,7 @@ function Register() {
   const validateField = (name, value) => {
     let error = "";
 
-    // Username
+    // USERNAME
     if (name === "username") {
       if (!value.trim()) {
         error = "Username is required";
@@ -67,18 +87,18 @@ function Register() {
       }
     }
 
-    // Email
+    // EMAIL
     if (name === "email") {
       if (!value.trim()) {
         error = "Email is required";
       } else if (value.length > EMAIL_MAX) {
         error = `Email max length is ${EMAIL_MAX}`;
       } else if (!emailRegex.test(value)) {
-        error = "Enter a valid email";
+        error = "Enter valid email";
       }
     }
 
-    // Password
+    // PASSWORD
     if (name === "password") {
       if (!value.trim()) {
         error = "Password is required";
@@ -102,6 +122,24 @@ function Register() {
       [name]: value,
     }));
 
+    // validate while typing AFTER touch
+    if (touched[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: validateField(name, value),
+      }));
+    }
+  };
+
+  // ---------------- HANDLE BLUR ----------------
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+
+    setTouched((prev) => ({
+      ...prev,
+      [name]: true,
+    }));
+
     setErrors((prev) => ({
       ...prev,
       [name]: validateField(name, value),
@@ -114,6 +152,14 @@ function Register() {
 
     let tempErrors = {};
 
+    // touch all fields
+    setTouched({
+      username: true,
+      email: true,
+      password: true,
+    });
+
+    // validate all
     Object.keys(formData).forEach((key) => {
       const error = validateField(
         key,
@@ -125,8 +171,10 @@ function Register() {
       }
     });
 
+    setErrors(tempErrors);
+
+    // stop submit if errors
     if (Object.keys(tempErrors).length > 0) {
-      setErrors(tempErrors);
       return;
     }
 
@@ -148,8 +196,16 @@ function Register() {
 
       if (res.data.success) {
         setMessage({
-          text: res.data.message,
+          text:
+            res.data.message ||
+            "Registration Successful",
           type: "success",
+        });
+
+        setFormData({
+          username: "",
+          email: "",
+          password: "",
         });
 
         setTimeout(() => {
@@ -157,7 +213,9 @@ function Register() {
         }, 1500);
       } else {
         setMessage({
-          text: res.data.message,
+          text:
+            res.data.message ||
+            "Registration failed",
           type: "error",
         });
       }
@@ -260,7 +318,7 @@ function Register() {
             "rgba(255,255,255,0.95)",
         }}
       >
-        {/* Header */}
+        {/* HEADER */}
         <Typography
           variant="h4"
           align="center"
@@ -283,7 +341,7 @@ function Register() {
           AI CHAT APP
         </Typography>
 
-        {/* Google Login */}
+        {/* GOOGLE LOGIN */}
         <Box
           sx={{
             display: "flex",
@@ -306,23 +364,31 @@ function Register() {
 
         {/* FORM */}
         <form onSubmit={handleSubmit}>
-          {/* Username */}
+          {/* USERNAME */}
           <TextField
             label="Username"
             name="username"
             fullWidth
             variant="outlined"
             value={formData.username}
-            error={!!errors.username}
-            helperText={errors.username}
             onChange={handleChange}
+            onBlur={handleBlur}
+            error={
+              touched.username &&
+              !!errors.username
+            }
+            helperText={
+              touched.username
+                ? errors.username
+                : ""
+            }
             inputProps={{
               maxLength: USERNAME_MAX,
             }}
             sx={{ mb: 2 }}
           />
 
-          {/* Email */}
+          {/* EMAIL */}
           <TextField
             label="Email"
             name="email"
@@ -330,16 +396,21 @@ function Register() {
             fullWidth
             variant="outlined"
             value={formData.email}
-            error={!!errors.email}
-            helperText={errors.email}
             onChange={handleChange}
+            onBlur={handleBlur}
+            error={
+              touched.email && !!errors.email
+            }
+            helperText={
+              touched.email ? errors.email : ""
+            }
             inputProps={{
               maxLength: EMAIL_MAX,
             }}
             sx={{ mb: 2 }}
           />
 
-          {/* Password */}
+          {/* PASSWORD */}
           <TextField
             label="Password"
             name="password"
@@ -348,9 +419,17 @@ function Register() {
               showPassword ? "text" : "password"
             }
             value={formData.password}
-            error={!!errors.password}
-            helperText={errors.password}
             onChange={handleChange}
+            onBlur={handleBlur}
+            error={
+              touched.password &&
+              !!errors.password
+            }
+            helperText={
+              touched.password
+                ? errors.password
+                : ""
+            }
             inputProps={{
               maxLength: PASSWORD_MAX,
             }}
@@ -376,7 +455,7 @@ function Register() {
             sx={{ mb: 2 }}
           />
 
-          {/* Submit Button */}
+          {/* SUBMIT BUTTON */}
           <Button
             type="submit"
             fullWidth
@@ -406,7 +485,7 @@ function Register() {
           </Button>
         </form>
 
-        {/* Message */}
+        {/* MESSAGE */}
         {message.text && (
           <Typography
             align="center"
@@ -423,7 +502,7 @@ function Register() {
           </Typography>
         )}
 
-        {/* Login Link */}
+        {/* LOGIN LINK */}
         <Typography
           align="center"
           sx={{ mt: 2 }}

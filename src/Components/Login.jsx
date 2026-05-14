@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+
 import {
   Box,
   Button,
@@ -15,6 +16,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 import { useNavigate, Link } from "react-router-dom";
+
 import axios from "axios";
 
 import BASE_URL from "../Services/apiConfig";
@@ -25,48 +27,137 @@ import { GoogleLogin } from "@react-oauth/google";
 const Login = () => {
   const navigate = useNavigate();
 
+  // ---------------- STATE ----------------
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  const [errors, setErrors] = useState({});
-  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+  });
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
   const [loading, setLoading] = useState(false);
+
   const [message, setMessage] = useState("");
 
   // ---------------- VALIDATION ----------------
-  const validate = () => {
-    let err = {};
 
-    // Email validation
-    if (!formData.email.trim()) {
-      err.email = "Email required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      err.email = "Invalid email";
-    } else if (formData.email.length > 50) {
-      err.email = "Email max length is 50";
+  const validateField = (name, value) => {
+    switch (name) {
+      case "email":
+        if (!value.trim()) {
+          return "Email required";
+        }
+
+        if (value.length > 50) {
+          return "Email max length is 50";
+        }
+
+        if (!/\S+@\S+\.\S+/.test(value)) {
+          return "Invalid email";
+        }
+
+        return "";
+
+      case "password":
+        if (!value.trim()) {
+          return "Password required";
+        }
+
+        if (value.length < 6) {
+          return "Minimum 6 characters";
+        }
+
+        if (value.length > 20) {
+          return "Password max length is 20";
+        }
+
+        return "";
+
+      default:
+        return "";
     }
+  };
 
-    // Password validation
-    if (!formData.password.trim()) {
-      err.password = "Password required";
-    } else if (formData.password.length < 6) {
-      err.password = "Min 6 characters";
-    } else if (formData.password.length > 20) {
-      err.password = "Password max length is 20";
+  // ---------------- FORM VALIDATION ----------------
+
+  const validateForm = () => {
+    let newErrors = {};
+
+    Object.keys(formData).forEach((key) => {
+      const error = validateField(
+        key,
+        formData[key]
+      );
+
+      if (error) {
+        newErrors[key] = error;
+      }
+    });
+
+    setErrors(newErrors);
+
+    // Make all fields touched on submit
+    setTouched({
+      email: true,
+      password: true,
+    });
+
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ---------------- HANDLE CHANGE ----------------
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    // Validate while typing only if field touched
+    if (touched[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: validateField(name, value),
+      }));
     }
+  };
 
-    setErrors(err);
+  // ---------------- HANDLE BLUR ----------------
 
-    return Object.keys(err).length === 0;
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+
+    setTouched((prev) => ({
+      ...prev,
+      [name]: true,
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [name]: validateField(name, value),
+    }));
   };
 
   // ---------------- LOGIN ----------------
+
   const handleLogin = async () => {
-    if (!validate()) return;
+    if (!validateForm()) return;
 
     setLoading(true);
+
     setMessage("");
 
     try {
@@ -79,17 +170,31 @@ const Login = () => {
       );
 
       if (res.data.success) {
-        sessionStorage.setItem("userId", res.data.userId);
-        sessionStorage.setItem("emailId", res.data.emailId);
-        sessionStorage.setItem("userName", res.data.userName);
+        sessionStorage.setItem(
+          "userId",
+          res.data.userId
+        );
+
+        sessionStorage.setItem(
+          "emailId",
+          res.data.emailId
+        );
+
+        sessionStorage.setItem(
+          "userName",
+          res.data.userName
+        );
 
         navigate("/Chat");
       } else {
-        setMessage(res.data.message || "Login failed");
+        setMessage(
+          res.data.message || "Login failed"
+        );
       }
     } catch (err) {
       setMessage(
-        err?.response?.data?.message || "Login failed"
+        err?.response?.data?.message ||
+          "Login failed"
       );
     } finally {
       setLoading(false);
@@ -97,8 +202,12 @@ const Login = () => {
   };
 
   // ---------------- GOOGLE LOGIN ----------------
-  const handleGoogleSuccess = async (credentialResponse) => {
+
+  const handleGoogleSuccess = async (
+    credentialResponse
+  ) => {
     setLoading(true);
+
     setMessage("");
 
     try {
@@ -113,13 +222,27 @@ const Login = () => {
       );
 
       if (res.data.success) {
-        sessionStorage.setItem("userId", res.data.userId);
-        sessionStorage.setItem("emailId", res.data.emailId);
-        sessionStorage.setItem("userName", res.data.userName);
+        sessionStorage.setItem(
+          "userId",
+          res.data.userId
+        );
+
+        sessionStorage.setItem(
+          "emailId",
+          res.data.emailId
+        );
+
+        sessionStorage.setItem(
+          "userName",
+          res.data.userName
+        );
 
         navigate("/Chat");
       } else {
-        setMessage(res.data.message || "Google login failed");
+        setMessage(
+          res.data.message ||
+            "Google login failed"
+        );
       }
     } catch (err) {
       setMessage(
@@ -150,11 +273,13 @@ const Login = () => {
           maxWidth: 420,
           width: "100%",
           borderRadius: 4,
-          backgroundColor: "rgba(255,255,255,0.9)",
+          backgroundColor:
+            "rgba(255,255,255,0.9)",
           backdropFilter: "blur(10px)",
         }}
       >
         {/* Header */}
+
         <Typography
           variant="h4"
           align="center"
@@ -180,6 +305,7 @@ const Login = () => {
         </Typography>
 
         {/* Google Login */}
+
         <Box
           sx={{
             display: "flex",
@@ -198,19 +324,17 @@ const Login = () => {
         <Divider sx={{ my: 2 }}>OR</Divider>
 
         {/* Email */}
+
         <TextField
           label="Email"
+          name="email"
           fullWidth
           variant="outlined"
           value={formData.email}
           error={!!errors.email}
           helperText={errors.email}
-          onChange={(e) =>
-            setFormData({
-              ...formData,
-              email: e.target.value,
-            })
-          }
+          onChange={handleChange}
+          onBlur={handleBlur}
           inputProps={{
             maxLength: 50,
           }}
@@ -218,19 +342,19 @@ const Login = () => {
         />
 
         {/* Password */}
+
         <TextField
           label="Password"
+          name="password"
           fullWidth
-          type={showPassword ? "text" : "password"}
+          type={
+            showPassword ? "text" : "password"
+          }
           value={formData.password}
           error={!!errors.password}
           helperText={errors.password}
-          onChange={(e) =>
-            setFormData({
-              ...formData,
-              password: e.target.value,
-            })
-          }
+          onChange={handleChange}
+          onBlur={handleBlur}
           inputProps={{
             maxLength: 20,
           }}
@@ -239,7 +363,9 @@ const Login = () => {
               <InputAdornment position="end">
                 <IconButton
                   onClick={() =>
-                    setShowPassword(!showPassword)
+                    setShowPassword(
+                      !showPassword
+                    )
                   }
                 >
                   {showPassword ? (
@@ -255,6 +381,7 @@ const Login = () => {
         />
 
         {/* Forgot Password */}
+
         <Typography
           variant="body2"
           sx={{
@@ -269,6 +396,7 @@ const Login = () => {
         </Typography>
 
         {/* Login Button */}
+
         <Button
           fullWidth
           variant="contained"
@@ -277,11 +405,17 @@ const Login = () => {
           sx={{
             background:
               "linear-gradient(45deg, #ff6b6b, #f06595)",
+
             color: "#fff",
+
             fontWeight: "bold",
+
             py: 1.2,
+
             borderRadius: 2,
+
             textTransform: "none",
+
             fontSize: "1rem",
 
             "&:hover": {
@@ -301,6 +435,7 @@ const Login = () => {
         </Button>
 
         {/* Error Message */}
+
         {message && (
           <Typography
             color="error"
@@ -312,6 +447,7 @@ const Login = () => {
         )}
 
         {/* Signup */}
+
         <Typography
           align="center"
           sx={{ mt: 3 }}
